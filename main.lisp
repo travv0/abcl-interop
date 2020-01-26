@@ -1,21 +1,22 @@
 (in-package :swing-test)
 
-(defvar *frame*)
-
 (defun create-and-show-gui ()
-  (setf *frame* (new 'JFrame "HelloWorldSwing"))
-  (let* ((label (new 'JLabel "Hello World")))
-    (~> *frame*
+  (let* ((frame (new 'JFrame "HelloWorldSwing"))
+         (label (new 'JLabel "Hello World")))
+    (~> frame
         (#"getContentPane")
         (#"add" label))
-    (#"pack" *frame*)
-    (show-gui)))
+    (#"pack" frame)
+    (show-gui frame)
+    frame))
 
-(defun show-gui ()
-  (#"setVisible" *frame* t))
+(defun show-gui (frame)
+  (#"setVisible" frame t)
+  frame)
 
-(defun hide-gui ()
-  (#"setVisible" *frame* nil))
+(defun hide-gui (frame)
+  (#"setVisible" frame nil)
+  frame)
 
 (defun runnable (f)
   (jmake-proxy (find-java-class 'Runnable)
@@ -23,6 +24,9 @@
                  (declare (ignore lt p))
                  (funcall f))))
 
-(defun main ()
+(defun invoke-later (f)
   (#"invokeLater" 'SwingUtilities
-                  (runnable 'create-and-show-gui)))
+                  (runnable f)))
+
+(defun main ()
+  (invoke-later 'create-and-show-gui))
