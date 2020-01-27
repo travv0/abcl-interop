@@ -1,21 +1,54 @@
 (in-package :swing-test)
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun get-element-names (gui-slots)
+    (mapcar #'car
+            (append (assoc-value gui-slots :components)
+                    (assoc-value gui-slots :panels))))
+
+  (defun default-args-to-slots (default-args)
+    (loop for (arg val) on default-args by #'cddr
+          collect (list (intern (string arg)) :initform val)))
+
+  (defun get-slot-setfs (gui-slots)
+    (append (mapcan (lambda (e) (list (car e) (cons 'make-instance (cdr e))))
+                    (assoc-value gui-slots :components))
+            (mapcan (lambda (e)
+                      (let ((items (cons 'list (cadr e))))
+                        (list (car e)
+                              (append '(make-instance 'panel :items) (list items) (cddr e)))))
+                    (assoc-value gui-slots :panels)))))
+
+(defmacro define-frame (name direct-superclasses direct-slots &rest gui-slots)
+  (let ((element-names (get-element-names gui-slots)))
+    `(progn
+       (defclass ,name ,(cons 'frame direct-superclasses)
+         ,(append
+           direct-slots
+           element-names
+           (default-args-to-slots (assoc-value gui-slots :default-args))))
+
+       (defmethod initialize-instance :before ((,name ,name) &key)
+         (with-slots ,(cons 'panels element-names) ,name
+           (setf ,@(get-slot-setfs gui-slots)
+                 panels ,(cons 'list (flatten (assoc-value gui-slots :arrangement)))))))))
+
+(define-frame celsius-converter ()
+  ()
+  (:components (celsius-input 'text-field :text "0")
+               (celsius-label 'label :text "Celsius")
+               (convert-button 'button :text "Convert")
+               (fahrenheit-label 'label :text "Fahrenheit"))
+  (:panels (top-panel (celsius-input celsius-label)
+                      :layout :horizontal)
+           (bottom-panel (convert-button fahrenheit-label)
+                         :layout :horizontal))
+  (:arrangement (top-panel bottom-panel))
+  (:default-args :layout :vertical
+                 :title "Celsius Converter"))
+
 (defun create-and-show-gui ()
-  (let ((frame (make-instance 'frame
-                              :title "Celsius Converter"
-                              :layout :vertical
-                              :panels (list
-                                       (make-instance 'panel
-                                                      :components (list
-                                                                   *text-field*
-                                                                   (make-instance 'label
-                                                                                  :text "Celsius")))
-                                       (make-instance 'panel
-                                                      :components (list
-                                                                   (make-instance 'button
-                                                                                  :text "Convert"
-                                                                                  :click-handler 'convert-celsius)
-                                                                   *label*))))))
+  (let ((frame (make-instance 'celsius-converter)))
     (display frame)))
 
 (defun convert-celsius ()
@@ -44,7 +77,7 @@
 
 (defclass button (component)
   ((text :reader button-text :initarg :text)
-   (click-handler :reader button-click-handler :initarg :click-handler)))
+   (click-handler :reader button-click-handler :initarg :click-handler :initform nil)))
 
 (defmethod initialize-instance :after ((button button) &key)
   (with-slots (jcomponent text click-handler) button
@@ -105,21 +138,17 @@
   ((jpanel :reader jpanel)
    (parent :reader panel-parent)
    (layout :reader panel-layout :initarg :layout :initform :horizontal)
-   (panels :initarg :panels :reader panel-panels :initform '())
-   (components :initarg :components :reader panel-components :initform '())))
+   (items :initarg :items :reader panel-items :initform '())))
 
 (defmethod initialize-instance :after ((panel panel) &key)
-  (with-slots (jpanel components panels layout) panel
+  (with-slots (jpanel items layout) panel
     (setf jpanel (new 'JPanel
                       (case layout
-                        (:vertical (new 'GridLayout (length components) 1))
-                        (:horizontal (new 'GridLayout 1 (length components))))))
-    (dolist (sub-panel panels)
-      (setf (slot-value sub-panel 'parent) panel)
-      (add panel sub-panel))
-    (dolist (component components)
-      (setf (slot-value component 'parent) panel)
-      (add panel component))))
+                        (:vertical (new 'GridLayout (length items) 1))
+                        (:horizontal (new 'GridLayout 1 (length items))))))
+    (dolist (item items)
+      (setf (slot-value item 'parent) panel)
+      (add panel item))))
 
 (defmethod add ((panel panel) (component component))
   (-> (jpanel panel) (#"add" (jcomponent component)))
