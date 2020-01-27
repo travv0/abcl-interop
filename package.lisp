@@ -1,5 +1,5 @@
 (defpackage :swing-test
   (:use #:cl
-        #:serapeum
+        #:cl-arrows
         #:java
         #:jss))

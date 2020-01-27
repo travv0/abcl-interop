@@ -2,6 +2,6 @@
 (asdf:defsystem #:swing-test
   :serial t
   :depends-on (:jss
-               :serapeum)
+               :cl-arrows)
   :components ((:file "package")
                (:file "main")))
